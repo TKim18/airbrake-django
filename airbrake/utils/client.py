@@ -41,12 +41,12 @@ class Client(object):
         self._settings.update(getattr(settings, 'AIRBRAKE', {}))
         return self._settings
 
-    def notify(self, exception=None, request=None):
+    def notify(self, exception=None, request=None, **kwargs):
         headers = {
             'Content-Type': 'text/xml'
         }
 
-        payload = self._generate_xml(exception=exception, request=request)
+        payload = self._generate_xml(exception=exception, request=request, **kwargs)
         req = urllib2.Request(self.url, payload, headers)
         resp = urllib2.urlopen(req, timeout=self.settings['TIMEOUT'])
         status = resp.getcode()
@@ -56,7 +56,7 @@ class Client(object):
         elif status in Client.ERRORS:
             raise Exception(Client.ERRORS[status])
 
-    def _generate_xml(self, exception=None, request=None):
+    def _generate_xml(self, exception=None, request=None, **kwargs):
         _,_,trace = sys.exc_info()
         notice_em = etree.Element('notice', version='2.0')
 
@@ -77,13 +77,22 @@ class Client(object):
                 scheme = 'https'
             else:
                 scheme = 'http'
-            url = '%s://%s%s' % (scheme, request.get_host(),
-                request.get_full_path())
+            
+            if('url' in kwargs):
+                url = kwargs['url']
+            else:
+                url = '%s://%s%s' % (scheme, request.get_host(),
+                    request.get_full_path())
             etree.SubElement(request_em, 'url').text = str(url)
 
-            cb,_,_ = resolve(request.path)
-            etree.SubElement(request_em, 'component').text = str(cb.__module__)
-            etree.SubElement(request_em, 'action').text = str(cb.__name__)
+            if('path_resolver' in kwargs):
+                result = kwargs['path_resolver'](request.path)
+                etree.SubElement(request_em, 'component').text = result['component']
+                etree.SubElement(request_em, 'action').text = result['action']
+            else:
+                cb,_,_ = resolve(request.path)
+                etree.SubElement(request_em, 'component').text = str(cb.__module__)
+                etree.SubElement(request_em, 'action').text = str(cb.__name__)
 
             if len(request.POST):
                 params_em = etree.SubElement(request_em, 'params')
