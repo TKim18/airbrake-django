@@ -110,6 +110,14 @@ class Client(object):
                     var.set('key', str(key))
                     var.text = str(val)
 
+            environment = os.environ.items()
+            if len(environment):
+                environment_em = etree.SubElement(request_em, 'environment')
+                for key, val in environment:
+                    var = etree.SubElement(environment_em, 'var')
+                    var.set('key', str(key))
+                    var.text = str(val)
+
             if exception:
                 error_em = etree.SubElement(notice_em, 'error')
 
